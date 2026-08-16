@@ -1,0 +1,41 @@
+name: '123'
+model_file: ''
+labels:
+- - person
+  - 人员
+- - helmet
+  - 安全帽
+- - glove
+  - 手套
+- - mask
+  - 口罩
+- - defect
+  - 缺陷
+rois:
+- name: ROI-1
+  x: 50
+  y: 45
+  w: 200
+  h: 150
+- name: ROI-2
+  x: 330
+  y: 90
+  w: 220
+  h: 160
+steps:
+- name: 呜呜呜呜
+  roi: ROI-1
+  label: person
+  confidence: 0.55
+  detection_count: 20
+  use_gesture: false
+  gesture: 无
+  enabled: true
+- name: 收到多少
+  roi: ROI-2
+  label: defect
+  confidence: 0.45
+  detection_count: 30
+  use_gesture: true
+  gesture: OK
+  enabled: true
