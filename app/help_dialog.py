@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QDate, Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QDialog,
     QHBoxLayout,
@@ -12,6 +12,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from .checkdog.license_manager import LicenseManager
 
 
 HELP_CONTENT = """
@@ -31,10 +33,13 @@ HELP_CONTENT = """
 class HelpDialog(QDialog):
     """帮助与激活对话框。"""
 
+    license_activated = pyqtSignal(str)
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("帮助与激活")
         self.resize(760, 540)
+        self.license_manager = LicenseManager()
 
         root = QVBoxLayout(self)
         self.tabs = QTabWidget()
@@ -42,6 +47,7 @@ class HelpDialog(QDialog):
 
         self.tabs.addTab(self._build_help_tab(), "帮助内容")
         self.tabs.addTab(self._build_activation_tab(), "软件激活")
+        self._refresh_license_display()
 
     def _build_help_tab(self) -> QWidget:
         page = QWidget()
@@ -67,6 +73,9 @@ class HelpDialog(QDialog):
         layout = QVBoxLayout(page)
 
         layout.addWidget(QLabel("请输入授权序列号或授权文件内容："))
+        self.machine_label = QLabel(f"当前机器码：{self.license_manager.machine_code()}")
+        self.machine_label.setWordWrap(True)
+        layout.addWidget(self.machine_label)
         self.activation_edit = QLineEdit()
         self.activation_edit.setPlaceholderText("XXXX-XXXX-XXXX-XXXX")
         layout.addWidget(self.activation_edit)
@@ -109,7 +118,23 @@ class HelpDialog(QDialog):
             self.activation_status.setText("激活状态：请输入授权码。")
             self.expiry_label.setText("到期时间：未激活")
             return
-        # 插入点：在此处接入授权服务、加密锁或 License 文件校验。
-        self.activation_status.setText("激活状态：授权码已提交，等待 License 服务校验（demo）。")
-        expiry = QDate.currentDate().addYears(1).toString("yyyy-MM-dd")
-        self.expiry_label.setText(f"到期时间：{expiry}")
+        ok, message = self.license_manager.activate(code)
+        if ok:
+            expiry = self.license_manager.expiry_date()
+            expiry_text = expiry.isoformat() if expiry else "未知"
+            self.activation_status.setText(f"激活状态：已激活，到期日期：{expiry_text}")
+            self.expiry_label.setText(f"到期时间：{expiry_text}")
+            self.license_activated.emit(expiry_text)
+        else:
+            self.activation_status.setText(f"激活状态：{message}")
+            self.expiry_label.setText("到期时间：未激活")
+
+    def _refresh_license_display(self) -> None:
+        if self.license_manager.is_activated():
+            expiry = self.license_manager.expiry_date()
+            expiry_text = expiry.isoformat() if expiry else "未知"
+            self.activation_status.setText(f"激活状态：已激活，到期日期：{expiry_text}")
+            self.expiry_label.setText(f"到期时间：{expiry_text}")
+        else:
+            self.activation_status.setText("激活状态：未激活")
+            self.expiry_label.setText("到期时间：未激活")

@@ -1,6 +1,6 @@
 camera_type: USB 相机
 driver: DirectShow
-camera: USB Camera 0
+camera: ''
 exposure: 6000.0
 gain: 1.0
 frame_rate: 30.0

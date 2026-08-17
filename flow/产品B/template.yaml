@@ -1,16 +1,11 @@
 name: 产品B
 model_file: ''
 labels:
-- - person
-  - 人员
-- - helmet
-  - 安全帽
-- - glove
-  - 手套
-- - mask
-  - 口罩
-- - defect
-  - 缺陷
+- person
+- helmet
+- glove
+- mask
+- defect
 rois:
 - name: ROI-1
   x: 50
