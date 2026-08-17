@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QCloseEvent
 from PyQt6.QtWidgets import (
     QButtonGroup,
@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMainWindow,
+    QMessageBox,
     QPushButton,
     QStackedWidget,
     QVBoxLayout,
@@ -15,6 +16,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .help_dialog import HelpDialog
+from .checkdog.license_manager import LicenseManager
 from .pages import (
     CameraPage,
     FlowPage,
@@ -52,6 +54,7 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(1100, 700)
 
         self.status_bar = StatusBar()
+        self.license_manager = LicenseManager()
         for key in ("dashboard_runtime", "dashboard_shift", "dashboard_cycle", "dashboard_device"):
             self.status_bar.add_item(key, "", side="right")
         self.stack = QStackedWidget()
@@ -74,6 +77,7 @@ class MainWindow(QMainWindow):
 
         self.setCentralWidget(central)
         self._set_active_page(0)
+        self._setup_license()
 
     def _build_pages(self) -> None:
         self.pages: list[QWidget] = []
@@ -182,6 +186,7 @@ class MainWindow(QMainWindow):
     def _show_help(self) -> None:
         if self.help_dialog is None:
             self.help_dialog = HelpDialog(self)
+            self.help_dialog.license_activated.connect(self._on_license_activated)
         self.help_dialog.show()
         self.help_dialog.raise_()
         self.help_dialog.activateWindow()
@@ -191,3 +196,25 @@ class MainWindow(QMainWindow):
         for page in self.pages:
             page.auto_save_config()
         super().closeEvent(event)
+
+    def _setup_license(self) -> None:
+        self.license_grace_timer = QTimer(self)
+        self.license_grace_timer.setInterval(30 * 60 * 1000)
+        self.license_grace_timer.timeout.connect(self._block_expired_license)
+        if self.license_manager.is_expired():
+            self.license_grace_timer.start()
+            self.status_bar.set_status("ready", "授权已到期", kind="warn")
+
+    def _block_expired_license(self) -> None:
+        self.stack.setEnabled(False)
+        self.license_grace_timer.stop()
+        QMessageBox.warning(
+            self,
+            "授权已到期",
+            "软件授权已到期，当前操作已锁定。\n请打开“帮助 -> 软件激活”输入新密钥。",
+        )
+
+    def _on_license_activated(self, expiry_date: str) -> None:
+        self.stack.setEnabled(True)
+        self.license_grace_timer.stop()
+        self.status_bar.set_status("ready", f"授权到期：{expiry_date}", kind="ok")
