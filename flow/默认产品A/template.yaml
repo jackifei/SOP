@@ -8,15 +8,17 @@ labels:
 - defect
 rois:
 - name: ROI-1
-  x: 50
-  y: 45
-  w: 200
-  h: 150
+  shape: rect
+  center_x: 150
+  center_y: 120
+  width: 200
+  height: 150
+  angle: 0
 - name: ROI-2
-  x: 330
-  y: 90
-  w: 220
-  h: 160
+  shape: circle
+  center_x: 420
+  center_y: 170
+  radius: 90
 steps:
 - name: 第一次检测
   roi: ROI-1

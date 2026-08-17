@@ -1,0 +1,4 @@
+shifts:
+- name: 班次 3
+  start: 00:53
+  end: '23:59'

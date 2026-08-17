@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+import csv
+import sys
+from datetime import datetime
+from pathlib import Path
+
 from PyQt6.QtCore import QDateTime, Qt
 from PyQt6.QtWidgets import (
     QAbstractItemView,
@@ -35,10 +40,11 @@ class LogPage(BasePage):
             parent,
         )
         self.config_service = ConfigService()
+        self.log_dir = self._log_directory()
         self._build_ui()
-        self._append_demo_logs()
-        self.set_result("检测结果：已加载演示日志")
-        self.set_tip("操作提示：可按级别筛选，后续可接入文件或数据库日志源。")
+        self._load_today_logs()
+        self.set_result("检测结果：已加载当天日志")
+        self.set_tip("操作提示：日志按日期保存到 log 目录，仅显示当天最近 100 条。")
 
     def _build_ui(self) -> None:
         group = QGroupBox("运行日志")
@@ -82,6 +88,18 @@ class LogPage(BasePage):
         self.export_button.clicked.connect(self._export_placeholder)
         self.save_filter_button.clicked.connect(self._save_filter_config)
 
+    def _log_directory(self) -> Path:
+        if getattr(sys, "frozen", False):
+            root = Path(sys.executable).resolve().parent
+        else:
+            root = Path(__file__).resolve().parents[2]
+        log_dir = root / "log"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        return log_dir
+
+    def _today_log_file(self) -> Path:
+        return self.log_dir / f"{datetime.now():%Y%m%d}.txt"
+
     def _append_demo_logs(self) -> None:
         samples = [
             ("INFO", "app", "应用启动"),
@@ -94,10 +112,14 @@ class LogPage(BasePage):
             self._append_log(level, source, message)
 
     def _append_log(self, level: str, source: str, message: str) -> None:
+        timestamp = QDateTime.currentDateTime().toString("yyyy-MM-dd HH:mm:ss")
+        with self._today_log_file().open("a", encoding="utf-8", newline="") as f:
+            csv.writer(f).writerow([timestamp, level, source, message])
+
         row = self.log_table.rowCount()
         self.log_table.insertRow(row)
 
-        time_item = QTableWidgetItem(QDateTime.currentDateTime().toString("yyyy-MM-dd HH:mm:ss"))
+        time_item = QTableWidgetItem(timestamp)
         level_item = QTableWidgetItem(level)
         source_item = QTableWidgetItem(source)
         message_item = QTableWidgetItem(message)
@@ -111,7 +133,41 @@ class LogPage(BasePage):
 
         for column, item in enumerate([time_item, level_item, source_item, message_item]):
             self.log_table.setItem(row, column, item)
+        self._trim_to_latest(100)
         self.log_table.scrollToBottom()
+
+    def _load_today_logs(self) -> None:
+        path = self._today_log_file()
+        if not path.exists():
+            return
+        rows = []
+        with path.open("r", encoding="utf-8", newline="") as f:
+            for row in csv.reader(f):
+                if len(row) >= 4:
+                    rows.append(row)
+        self.log_table.setRowCount(0)
+        for row in rows[-100:]:
+            self._insert_log_row(row[0], row[1], row[2], row[3])
+
+    def _insert_log_row(self, timestamp: str, level: str, source: str, message: str) -> None:
+        row = self.log_table.rowCount()
+        self.log_table.insertRow(row)
+        time_item = QTableWidgetItem(timestamp)
+        level_item = QTableWidgetItem(level)
+        source_item = QTableWidgetItem(source)
+        message_item = QTableWidgetItem(message)
+        if level == "ERROR":
+            level_item.setForeground(Qt.GlobalColor.red)
+        elif level == "WARN":
+            level_item.setForeground(Qt.GlobalColor.yellow)
+        elif level == "INFO":
+            level_item.setForeground(Qt.GlobalColor.green)
+        for column, item in enumerate([time_item, level_item, source_item, message_item]):
+            self.log_table.setItem(row, column, item)
+
+    def _trim_to_latest(self, max_rows: int = 100) -> None:
+        while self.log_table.rowCount() > max_rows:
+            self.log_table.removeRow(0)
 
     def _apply_filter(self, level: str) -> None:
         for row in range(self.log_table.rowCount()):

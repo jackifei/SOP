@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QTime, Qt
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -8,9 +8,14 @@ from PyQt6.QtWidgets import (
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
+    QHeaderView,
+    QLabel,
     QLineEdit,
     QPushButton,
     QScrollArea,
+    QTableWidget,
+    QTableWidgetItem,
+    QTimeEdit,
     QVBoxLayout,
     QWidget,
 )
@@ -22,9 +27,11 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
     from app.pages.base_page import BasePage
     from app.services.config_service import ConfigService
+    from app.services.production_stats_service import ProductionStatsService
 else:
     from .base_page import BasePage
     from ..services.config_service import ConfigService
+    from ..services.production_stats_service import ProductionStatsService
 
 
 class ParametersPage(BasePage):
@@ -41,6 +48,7 @@ class ParametersPage(BasePage):
             parent,
         )
         self.config_service = ConfigService()
+        self.stats_service = ProductionStatsService()
         self._build_ui()
         self._load_config()
         self.set_result("检测结果：系统参数已加载")
@@ -99,6 +107,35 @@ class ParametersPage(BasePage):
         storage_form.addRow("数据存储目录", data_row)
         layout.addWidget(storage_group)
 
+        shift_group = QGroupBox("班次设置")
+        shift_layout = QVBoxLayout(shift_group)
+        shift_hint = QLabel("最多 6 个班，时间格式 HH:MM。")
+        shift_layout.addWidget(shift_hint)
+
+        count_mode_row = QHBoxLayout()
+        count_mode_row.addWidget(QLabel("计数方式"))
+        self.count_mode_combo = QComboBox()
+        self.count_mode_combo.addItems(["日计数", "班计数"])
+        self.count_mode_combo.setCurrentText(self.stats_service.count_mode)
+        count_mode_row.addWidget(self.count_mode_combo)
+        count_mode_row.addStretch(1)
+        shift_layout.addLayout(count_mode_row)
+
+        self.shift_table = QTableWidget(6, 3)
+        self.shift_table.setHorizontalHeaderLabels(["班次", "开始时间", "结束时间"])
+        self.shift_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.shift_table.verticalHeader().setVisible(False)
+        for row in range(6):
+            self.shift_table.setItem(row, 0, QTableWidgetItem(f"班次 {row + 1}"))
+            start_edit = QTimeEdit(QTime(0, 0))
+            start_edit.setDisplayFormat("HH:mm")
+            end_edit = QTimeEdit(QTime(23, 59))
+            end_edit.setDisplayFormat("HH:mm")
+            self.shift_table.setCellWidget(row, 1, start_edit)
+            self.shift_table.setCellWidget(row, 2, end_edit)
+        shift_layout.addWidget(self.shift_table)
+        layout.addWidget(shift_group)
+
         self.save_button = QPushButton("保存系统参数")
         layout.addWidget(self.save_button)
         layout.addStretch(1)
@@ -109,6 +146,7 @@ class ParametersPage(BasePage):
         self.save_button.clicked.connect(self._save_config)
         self.result_dir_button.clicked.connect(self._choose_result_dir)
         self.data_dir_button.clicked.connect(self._choose_data_dir)
+        self._load_shift_config()
 
     def _save_config(self) -> None:
         self.config_service.save_page_config(
@@ -121,6 +159,7 @@ class ParametersPage(BasePage):
                 "data_dir": self.data_dir_edit.text(),
             },
         )
+        self._save_shift_config()
         self.set_tip("操作提示：系统参数已保存到 config/system.yaml。")
 
     def _load_config(self) -> None:
@@ -132,6 +171,35 @@ class ParametersPage(BasePage):
         self.auto_save_check.setChecked(bool(data.get("auto_save", self.auto_save_check.isChecked())))
         self.result_dir_edit.setText(str(data.get("result_dir", "")))
         self.data_dir_edit.setText(str(data.get("data_dir", "")))
+
+    def _collect_shifts(self) -> list[dict]:
+        shifts = []
+        for row in range(self.shift_table.rowCount()):
+            name_item = self.shift_table.item(row, 0)
+            start_widget = self.shift_table.cellWidget(row, 1)
+            end_widget = self.shift_table.cellWidget(row, 2)
+            name = name_item.text().strip() if name_item else ""
+            start = start_widget.time().toString("HH:mm") if isinstance(start_widget, QTimeEdit) else ""
+            end = end_widget.time().toString("HH:mm") if isinstance(end_widget, QTimeEdit) else ""
+            if start and end and (start != "00:00" or end != "23:59"):
+                shifts.append({"name": name or f"班次 {row + 1}", "start": start, "end": end})
+        return shifts
+
+    def _save_shift_config(self) -> None:
+        self.config_service.save_page_config("shifts", {"shifts": self._collect_shifts()})
+        self.stats_service.set_count_mode(self.count_mode_combo.currentText())
+
+    def _load_shift_config(self) -> None:
+        data = self.config_service.load_page_config("shifts")
+        shifts = data.get("shifts", [])
+        for row, shift in enumerate(shifts[:6]):
+            self.shift_table.item(row, 0).setText(str(shift.get("name", f"班次 {row + 1}")))
+            start = QTime.fromString(str(shift.get("start", "00:00")), "HH:mm")
+            end = QTime.fromString(str(shift.get("end", "23:59")), "HH:mm")
+            if start.isValid():
+                self.shift_table.cellWidget(row, 1).setTime(start)
+            if end.isValid():
+                self.shift_table.cellWidget(row, 2).setTime(end)
 
     def _choose_result_dir(self) -> None:
         directory = QFileDialog.getExistingDirectory(self, "选择检测结果存储目录")

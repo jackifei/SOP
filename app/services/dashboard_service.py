@@ -3,6 +3,8 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass
 
+from .production_stats_service import ProductionStatsService
+
 
 @dataclass
 class DashboardStep:
@@ -76,17 +78,29 @@ class DashboardService:
         },
     }
 
+    def __init__(self) -> None:
+        self.stats = ProductionStatsService()
+
+    def set_count_mode(self, mode: str) -> None:
+        self.stats.set_count_mode(mode)
+
+    def add_ok_result(self) -> None:
+        self.stats.add_ok()
+
+    def add_ng_result(self) -> None:
+        self.stats.add_ng()
+
     def snapshot(self, template_name: str) -> DashboardSnapshot:
         data = self.TEMPLATES.get(template_name, self.TEMPLATES["默认产品A"])
-        ok_rate = round(data["ok"] / max(data["ok"] + data["ng"], 1) * 100, 1)
+        stats = self.stats.snapshot()
         return DashboardSnapshot(
             template_name=template_name,
-            ok=data["ok"],
-            ng=data["ng"],
-            today=data["today"],
-            week=data["week"],
-            month=data["month"],
-            ok_rate=ok_rate,
+            ok=stats["ok"],
+            ng=stats["ng"],
+            today=stats["today"],
+            week=stats["week"],
+            month=stats["month"],
+            ok_rate=stats["ok_rate"],
             steps=data["steps"],
             rois=data["rois"],
             runtime=data["runtime"],
@@ -100,10 +114,5 @@ class DashboardService:
 
         插入点：替换为真实统计接口或数据库查询后，保留 snapshot 数据结构即可。
         """
-        data = self.TEMPLATES.get(template_name, self.TEMPLATES["默认产品A"])
-        data["ok"] += random.randint(0, 3)
-        data["ng"] += random.choice([0, 0, 0, 1])
-        data["today"] += random.randint(0, 2)
-        data["week"] += random.randint(0, 3)
-        data["month"] += random.randint(0, 8)
+        self.stats.simulate_refresh()
         return self.snapshot(template_name)

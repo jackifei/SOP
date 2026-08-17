@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import QRect, Qt
-from PyQt6.QtGui import QColor, QFont, QPainter, QPen
+from PyQt6.QtGui import QColor, QFont, QPainter, QPen, QPixmap
 from PyQt6.QtWidgets import QWidget
 
 
@@ -17,6 +17,11 @@ class CameraViewWidget(QWidget):
         self.setMinimumSize(520, 360)
         self.rois: list[tuple[int, int, int, int]] = []
         self.status_text = "等待相机画面"
+        self.image: QPixmap | None = None
+
+    def set_image(self, pixmap: QPixmap) -> None:
+        self.image = pixmap
+        self.update()
 
     def set_rois(self, rois: list[tuple[int, int, int, int]]) -> None:
         self.rois = rois
@@ -30,6 +35,14 @@ class CameraViewWidget(QWidget):
         del event
         painter = QPainter(self)
         painter.fillRect(self.rect(), QColor("#111111"))
+
+        if self.image is not None and not self.image.isNull():
+            scale = min(self.width() / self.image.width(), self.height() / self.image.height())
+            w = self.image.width() * scale
+            h = self.image.height() * scale
+            x = (self.width() - w) / 2.0
+            y = (self.height() - h) / 2.0
+            painter.drawPixmap(int(x), int(y), int(w), int(h), self.image)
 
         # 画中心十字线，模拟相机取景辅助线。
         center = self.rect().center()

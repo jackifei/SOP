@@ -24,11 +24,13 @@ if __package__ in (None, ""):
 
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
     from app.pages.base_page import BasePage
+    from app.services.image_hub import image_hub
     from app.services.config_service import ConfigService
     from app.widgets.camera_image_view import CameraImageView
     from drivers.camera.usb_camera import UsbCameraCaptureThread, UsbCameraDriver
 else:
     from .base_page import BasePage
+    from ..services.image_hub import image_hub
     from ..services.config_service import ConfigService
     from ..widgets.camera_image_view import CameraImageView
     from drivers.camera.usb_camera import UsbCameraCaptureThread, UsbCameraDriver
@@ -236,6 +238,7 @@ class CameraPage(BasePage):
             return
         self._stop_preview()
         self.image_view.set_pixmap(pixmap)
+        image_hub.set_pixmap(pixmap)
         self._emit_camera_metrics(0, f"{pixmap.width()}x{pixmap.height()}")
         self.set_result(f"检测结果：已打开本地图像 {file_path}")
 
@@ -266,6 +269,7 @@ class CameraPage(BasePage):
             return
         pixmap = self._frame_to_pixmap(frame)
         self.image_view.set_pixmap(pixmap)
+        image_hub.set_pixmap(pixmap)
         height, width = frame.shape[:2]
         self._emit_camera_metrics(1, f"{width}x{height}")
         self.set_result(f"检测结果：拍照完成，图像大小 {width}x{height}")
@@ -278,6 +282,7 @@ class CameraPage(BasePage):
         height, width = frame.shape[:2]
         pixmap = self._frame_to_pixmap(frame)
         self.image_view.set_pixmap(pixmap)
+        image_hub.set_pixmap(pixmap)
         self._emit_camera_metrics(round(fps, 1), f"{width}x{height}")
 
     def _frame_to_pixmap(self, frame) -> QPixmap:

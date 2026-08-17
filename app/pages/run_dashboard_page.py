@@ -27,8 +27,10 @@ if __package__ in (None, ""):
 
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
     from app.pages.base_page import BasePage
+    from app.services.image_hub import image_hub
 else:
     from .base_page import BasePage
+    from ..services.image_hub import image_hub
 
 
 class RunDashboardPage(BasePage):
@@ -50,8 +52,12 @@ class RunDashboardPage(BasePage):
         self.service = DashboardService()
         self.current_template_name = "默认产品A"
         self.current_steps = []
+        image_hub.image_changed.connect(self._on_shared_image)
         self._build_ui()
         self._load_dashboard(self.current_template_name)
+        current = image_hub.current_pixmap()
+        if current is not None:
+            self.camera_view.set_image(current)
 
     def _build_ui(self) -> None:
         self.add_to_content(self._build_dashboard_status_group())
@@ -113,6 +119,9 @@ class RunDashboardPage(BasePage):
         layout.addWidget(self.roi_label)
         return group
 
+    def _on_shared_image(self, pixmap) -> None:
+        self.camera_view.set_image(pixmap)
+
     def _build_step_area(self) -> QGroupBox:
         group = QGroupBox("流程步骤状态")
         layout = QVBoxLayout(group)
@@ -139,8 +148,12 @@ class RunDashboardPage(BasePage):
         control_row = QHBoxLayout()
         self.reset_fault_button = QPushButton("复位故障")
         self.skip_step_button = QPushButton("跳过当前步骤")
+        self.simulate_ok_button = QPushButton("模拟OK+1")
+        self.simulate_ng_button = QPushButton("模拟NG+1")
         control_row.addWidget(self.reset_fault_button)
         control_row.addWidget(self.skip_step_button)
+        control_row.addWidget(self.simulate_ok_button)
+        control_row.addWidget(self.simulate_ng_button)
         control_row.addStretch(1)
         layout.addLayout(control_row)
 
@@ -150,6 +163,8 @@ class RunDashboardPage(BasePage):
 
         self.reset_fault_button.clicked.connect(self._reset_fault)
         self.skip_step_button.clicked.connect(self._skip_current_step)
+        self.simulate_ok_button.clicked.connect(self._simulate_ok)
+        self.simulate_ng_button.clicked.connect(self._simulate_ng)
         return group
 
     def _build_full_status_area(self) -> QGroupBox:
@@ -284,6 +299,16 @@ class RunDashboardPage(BasePage):
                 step.duration = "--"
         self._populate_steps(self.current_steps)
         self.set_tip("操作提示：故障状态已复位，相关步骤回到待执行状态。")
+
+    def _simulate_ok(self) -> None:
+        self.service.add_ok_result()
+        self._load_dashboard(self.current_template_name)
+        self.set_tip("操作提示：已模拟 OK +1。")
+
+    def _simulate_ng(self) -> None:
+        self.service.add_ng_result()
+        self._load_dashboard(self.current_template_name)
+        self.set_tip("操作提示：已模拟 NG +1。")
 
     def _skip_current_step(self) -> None:
         row = self.step_table.currentRow()

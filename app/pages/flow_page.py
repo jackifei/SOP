@@ -33,10 +33,12 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
     from app.pages.base_page import BasePage
     from app.services.config_service import ConfigService
+    from app.services.image_hub import image_hub
     from app.widgets import RoiCanvas, RoiEditorDialog
 else:
     from .base_page import BasePage
     from ..services.config_service import ConfigService
+    from ..services.image_hub import image_hub
     from ..widgets import RoiCanvas, RoiEditorDialog
 
 
@@ -69,8 +71,22 @@ def _default_template(name: str) -> dict:
             },
         ],
         "rois": [
-            {"name": "ROI-1", "x": 50, "y": 45, "w": 200, "h": 150},
-            {"name": "ROI-2", "x": 330, "y": 90, "w": 220, "h": 160},
+            {
+                "name": "ROI-1",
+                "shape": "rect",
+                "center_x": 150,
+                "center_y": 120,
+                "width": 200,
+                "height": 150,
+                "angle": 0,
+            },
+            {
+                "name": "ROI-2",
+                "shape": "circle",
+                "center_x": 420,
+                "center_y": 170,
+                "radius": 90,
+            },
         ],
     }
 
@@ -96,8 +112,12 @@ class FlowPage(BasePage):
         }
         self.config_service = ConfigService()
         self.current_template_name = ""
+        image_hub.image_changed.connect(self._on_shared_image)
         self._build_ui()
         self._load_template("默认产品A")
+        current = image_hub.current_pixmap()
+        if current is not None:
+            self.roi_canvas.set_image(current)
 
     def _build_ui(self) -> None:
         top_splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -139,7 +159,17 @@ class FlowPage(BasePage):
         self.edit_roi_button = QPushButton("编辑 ROI")
         layout.addWidget(self.edit_roi_button)
         self.edit_roi_button.clicked.connect(self._open_roi_editor)
+
+        cross_row = QHBoxLayout()
+        self.show_cross_check = QCheckBox("显示十字线")
+        self.show_cross_check.setChecked(False)
+        cross_row.addWidget(self.show_cross_check)
+        layout.addLayout(cross_row)
+        self.show_cross_check.toggled.connect(self.roi_canvas.set_show_cross)
         return group
+
+    def _on_shared_image(self, pixmap) -> None:
+        self.roi_canvas.set_image(pixmap)
 
     def _build_combined_area(self) -> QGroupBox:
         group = QGroupBox("产品模板 / 模型标签")
@@ -451,7 +481,11 @@ class FlowPage(BasePage):
         return options
 
     def _open_roi_editor(self) -> None:
-        dialog = RoiEditorDialog(self.roi_canvas.get_rois(), self)
+        dialog = RoiEditorDialog(
+            self.roi_canvas.get_rois(),
+            image_hub.current_pixmap(),
+            self,
+        )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         self.roi_canvas.set_rois(dialog.selected_rois())

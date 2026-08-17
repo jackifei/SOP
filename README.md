@@ -32,11 +32,11 @@ python -m pip install pyinstaller
 打包 `main.py` 为单个 exe，并同时打包 `config`、`flow` 目录：
 
 ```powershell
-pyinstaller --noconfirm --windowed --onefile --name SOP --add-data "config;config" --add-data "flow;flow" main.py
+pyinstaller --noconfirm --windowed --onefile --name SOP --add-data "config;config" --add-data "flow;flow" --add-data "log;log" main.py
 ```
 打包小exe，附加配置文件，运行时自动创建
 ```
-pyinstaller -D main.py --noconfirm --windowed --icon=MyAppLog.ico --name SOP_APP --uac-admin --add-data "config;config" --add-data "flow;flow"
+pyinstaller -D main.py --noconfirm --windowed --icon=MyAppLog.ico --name SOP_APP --uac-admin --add-data "config;config" --add-data "log;log" --add-data "flow;flow"
 ```
 说明：Windows 下 `--add-data` 使用分号 `;` 分隔源目录和目标目录；Linux/macOS 使用冒号 `:`。
 
