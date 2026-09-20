@@ -21,7 +21,7 @@ rois:
   radius: 90
 steps:
 - name: 第一次检测
-  roi: ROI-2
+  roi: ROI-1
   label: person
   confidence: 0.55
   detection_count: 20
@@ -30,7 +30,7 @@ steps:
   enabled: true
 - name: 第二次检测
   roi: ROI-2
-  label: glove
+  label: defect
   confidence: 0.45
   detection_count: 30
   use_gesture: true
